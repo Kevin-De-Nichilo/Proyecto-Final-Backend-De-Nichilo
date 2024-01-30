@@ -1,77 +1,79 @@
-const http = require("http");
-
-// const server = http.createServer( (request, response)=> {
-//     console.log("Se realizó una petición al servidor");
-//     response.end("Miren, estoy programando sin manos!");
-// } )
-
+const express = require("express");
+const app = express();
 const PUERTO = 8080;
 
-const express = require("express");
+const ProductManager = require("../src/controllers/product-manager.js");
+const productManager = new ProductManager("./src/models/productos.json");
 
-//Creamos una aplicación de express.
+//Middleware
+app.use(express.json());
 
-const app = express();
+//Listar todos los productos
 
-app.get("/", (req, res) => {
-  //Cuando utilizo "/" estoy haciendo referencia a la ruta raíz de mi aplicación.
-  res.send("Mi respuesta desde Express");
-});
+app.get("/api/products", async (req, res) => {
+  try {
+    const limit = req.query.limit;
+    const productos = await productManager.getProducts();
 
-app.get("/tienda", (req, res) => {
-  res.send("Bienvenido a la tienda");
-});
-
-app.get("/contacto", (req, res) => {
-  res.send("Estamos en contacto ahora");
-});
-
-//Los métodos HTTP o verbos son los que nos permiten indicarle al servidor que tipo de acción queremos realizar. Los más utilizados:
-
-//GET: pido datos al servidor.
-//POST: envio info al servidor.
-//PUT: lo uso para actualizar info en el servidor.
-//DELETE: lo uso para borrar datos en el servidor.
-
-app.listen(PUERTO, () => {
-  console.log(`Escuchando en el http://localhost:${PUERTO}`);
-});
-
-const arrayProductos = [
-  { id: 1, nombre: "fideos", precio: 150 },
-  { id: 2, nombre: "arroz", precio: 250 },
-  { id: 3, nombre: "pan", precio: 350 },
-  { id: 4, nombre: "leche", precio: 450 },
-  { id: 5, nombre: "aceite", precio: 550 },
-];
-
-app.get("/productos", (req, res) => {
-  //lo podemos retornar así:
-  res.send(arrayProductos);
-});
-
-app.get("/productos/:id", (req, res) => {
-  let id = req.params.id;
-  //Viene como string.
-
-  //console.log(id, typeof id);
-
-  let producto = arrayProductos.find((producto) => producto.id == id);
-
-  if (producto) {
-    res.send(producto);
-  } else {
-    res.send("Producto no encontrado, vamos a morir!");
+    if (limit) {
+      res.json(productos.slice(0, limit));
+    } else {
+      res.json(productos);
+    }
+  } catch (error) {
+    console.log("Error al obtener los productos", error);
+    res.status(500).json({ error: "Error del servidor" });
   }
 });
 
-//datos complejos se recomienda usar la linea:
+//Traer un solo producto por id:
 
-app.use(express.urlencoded({ extended: true }));
+app.get("/api/products/:pid", async (req, res) => {
+  let id = req.params.pid;
 
-app.get("/clientes", (req, res) => {
-  let nombre = req.query.nombre;
-  let apellido = req.query.apellido;
-
-  res.send(`Bienvenido ${nombre} ${apellido}`);
+  try {
+    const producto = await productManager.getProductById(parseInt(id));
+    if (!producto) {
+      res.json({
+        error: "Producto no encontrado",
+      });
+    } else {
+      res.json(producto);
+    }
+  } catch (error) {
+    console.log("Error al obtener el producto", error);
+    res.status(500).json({ error: "Error del servidor" });
+  }
 });
+
+//Agregar un nuevo producto por post:
+
+app.post("/api/products", async (req, res) => {
+  const nuevoProducto = req.body;
+  console.log(nuevoProducto);
+
+  try {
+    await productManager.addProduct(nuevoProducto),
+      res.status(201).json({ message: "Producto agregado exitosamente" });
+  } catch (error) {
+    console.log("error al agregar un producto ", error);
+    res.status(500).json({ error: "error del servidor, vamos a morir" });
+  }
+});
+
+//Actualizamos producto por id:
+
+app.put("/api/products/:pid", async (req, res) => {
+  let id = req.params.pid;
+  const productoActualizado = req.body;
+
+  try {
+    await productManager.updateProduct(parseInt(id), productoActualizado);
+    res.json({ message: "Producto actualizado correctamente" });
+  } catch (error) {
+    console.log("No pudimos actualizar, vamos a morir ", error);
+    res.status(500).json({ error: "Error del server" });
+  }
+});
+
+app.listen(PUERTO);
