@@ -1,79 +1,70 @@
+const mongoose = require("mongoose");
+const OrderModel = require("./models/order.js");
+
+const main = async () => {
+  mongoose.connect(
+    "mongodb+srv://coderhouse50045:coderhouse@cluster0.fpmis3v.mongodb.net/Pizza?retryWrites=true&w=majority&appName=Cluster0"
+  );
+
+  const resultado = await OrderModel.paginate(
+    { tam: "familiar" },
+    { limit: 2, page: 1 }
+  );
+  console.log(resultado);
+};
+
+main();
+
+//2) Paginacion:
+//Es un proceso que consiste en dividir los resultados de una consulta en bloques de datos.
+
+//Instalamos: npm install mongoose-paginate-v2
+//Usamos el método plugin en el order.js
+
 const express = require("express");
 const app = express();
 const PUERTO = 8080;
-
-const ProductManager = require("../src/controllers/product-manager.js");
-const productManager = new ProductManager("./src/models/productos.json");
+const exphbs = require("express-handlebars");
 
 //Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-//Listar todos los productos
+//Handlebars
+app.engine("handlebars", exphbs.engine());
+app.set("view engine", "handlebars");
+app.set("views", "./src/views");
 
-app.get("/api/products", async (req, res) => {
+//Rutas
+
+app.get("/pizzas", async (req, res) => {
+  const page = req.query.page || 1;
+  const limit = 2;
   try {
-    const limit = req.query.limit;
-    const productos = await productManager.getProducts();
+    const pizzasListado = await OrderModel.paginate({}, { limit, page });
 
-    if (limit) {
-      res.json(productos.slice(0, limit));
-    } else {
-      res.json(productos);
-    }
+    //Recuperamos el docs:
+
+    const pizzasResultadoFinal = pizzasListado.docs.map((pizza) => {
+      const { _id, ...rest } = pizza.toObject();
+      return rest;
+    });
+
+    res.render("pizzas", {
+      pizzas: pizzasResultadoFinal,
+      hasPrevPage: pizzasListado.hasPrevPage,
+      hasNextPage: pizzasListado.hasNextPage,
+      prevPage: pizzasListado.prevPage,
+      nextPage: pizzasListado.nextPage,
+      currentPage: pizzasListado.page,
+      totalPages: pizzasListado.totalPages,
+    });
   } catch (error) {
-    console.log("Error al obtener los productos", error);
-    res.status(500).json({ error: "Error del servidor" });
+    console.log("Error en la paginacion", error);
+    res.status(500).send("Error en el servidor, vamos a re morir todos");
   }
 });
 
-//Traer un solo producto por id:
-
-app.get("/api/products/:pid", async (req, res) => {
-  let id = req.params.pid;
-
-  try {
-    const producto = await productManager.getProductById(parseInt(id));
-    if (!producto) {
-      res.json({
-        error: "Producto no encontrado",
-      });
-    } else {
-      res.json(producto);
-    }
-  } catch (error) {
-    console.log("Error al obtener el producto", error);
-    res.status(500).json({ error: "Error del servidor" });
-  }
-});
-
-//Agregar un nuevo producto por post:
-
-app.post("/api/products", async (req, res) => {
-  const nuevoProducto = req.body;
-  console.log(nuevoProducto);
-
-  try {
-    await productManager.addProduct(nuevoProducto),
-      res.status(201).json({ message: "Producto agregado exitosamente" });
-  } catch (error) {
-    console.log("error al agregar un producto ", error);
-    res.status(500).json({ error: "error del servidor, vamos a morir" });
-  }
-});
-
-//Actualizamos producto por id:
-
-app.put("/api/products/:pid", async (req, res) => {
-  let id = req.params.pid;
-  const productoActualizado = req.body;
-
-  try {
-    await productManager.updateProduct(parseInt(id), productoActualizado);
-    res.json({ message: "Producto actualizado correctamente" });
-  } catch (error) {
-    console.log("No pudimos actualizar, vamos a morir ", error);
-    res.status(500).json({ error: "Error del server" });
-  }
-});
+//Listen
 
 app.listen(PUERTO);
