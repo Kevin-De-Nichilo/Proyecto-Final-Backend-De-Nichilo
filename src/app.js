@@ -1,77 +1,56 @@
-const express = require("express");
+import express from "express";
+import mongoose from "mongoose";
+import cookieParser from "cookie-parser";
+
+import usersRouter from "./routes/users.router.js";
+import petsRouter from "./routes/pets.router.js";
+import adoptionsRouter from "./routes/adoption.router.js";
+import sessionsRouter from "./routes/sessions.router.js";
+
 const app = express();
-const exphbs = require("express-handlebars");
-const cookieParser = require("cookie-parser");
-const passport = require("passport");
-const initializePassport = require("./config/passport.config.js");
-const cors = require("cors");
-const path = require("path");
-const PUERTO = 8080;
-require("./database.js");
+const PORT = process.env.PORT || 8080;
+const connection = mongoose.connect(
+  `mongodb+srv://coderhouse50045:coderhouse@cluster0.fpmis3v.mongodb.net/Adoptame?retryWrites=true&w=majority&appName=Cluster0`
+);
 
-const productsRouter = require("./routes/products.router.js");
-const cartsRouter = require("./routes/carts.router.js");
-const viewsRouter = require("./routes/views.router.js");
-const userRouter = require("./routes/user.router.js");
-
-//Middleware
-app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-//app.use(express.static("./src/public"));
-app.use(express.static(path.join(__dirname, "public")));
-app.use(cors());
-
-//Passport
-app.use(passport.initialize());
-initializePassport();
 app.use(cookieParser());
 
-//AuthMiddleware
-const authMiddleware = require("./middleware/authmiddleware.js");
-app.use(authMiddleware);
+app.use("/api/users", usersRouter);
+app.use("/api/pets", petsRouter);
+app.use("/api/adoptions", adoptionsRouter);
+app.use("/api/sessions", sessionsRouter);
 
-//Handlebars
-app.engine("handlebars", exphbs.engine());
-app.set("view engine", "handlebars");
-app.set("views", "./src/views");
+app.listen(PORT, () => console.log(`Listening on ${PORT}`));
 
-//Rutas:
-app.use("/api/products", productsRouter);
-app.use("/api/carts", cartsRouter);
-app.use("/api/users", userRouter);
-app.use("/", viewsRouter);
+//1) Instalamos swagger:
+//npm install swagger-jsdoc swagger-ui-express
 
-const httpServer = app.listen(PUERTO, () => {
-  console.log(`Servidor escuchando en el puerto ${PUERTO}`);
-});
+//swagger-jsdoc: nos deja escribir la configuracion en un archivo .yaml (tambien json)  y a partir de ahi se genera un apidoc.
 
-///Websockets:
-const SocketManager = require("./sockets/socketmanager.js");
-new SocketManager(httpServer);
+//swagger-ui-express: nos permitirá linkear una interfaz gráfica para poder visualizar la documentacion.
 
-//Codigo actualizar cantidades:
-// async updateProductQuantity(cartId, productId, updatedQuantity) {
-//     try {
-//       const cartItem = await CartModel.findById(cartId);
-//       if (!cartItem) {
-//         throw new Error('Invalid cart id');
-//       }
+//2) Importamos los módulos:
 
-//       const product = cartItem.products.find(
-//         (item) => item.product._id.toString() === productId
-//       );
+import swaggerJSDoc from "swagger-jsdoc";
+import swaggerUiExpress from "swagger-ui-express";
 
-//       if (!product) {
-//         throw new Error('Invalid product id');
-//       }
+//3) Creamos un objeto de configuración: swaggerOptions
 
-//       product.quantity = updatedQuantity;
-//       cartItem.markModified('products');
-//       await cartItem.save();
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.1",
+    info: {
+      title: "Documentación de la App Adoptame",
+      description:
+        "App Web dedicada a encontrar familias para los perritos de la calle",
+    },
+  },
+  apis: ["./src/docs/**/*.yaml"],
+};
 
-//       return cartItem;
-//     } catch (error) {
-//       console.error('Error while updating the product quantity', error);
-//       throw new Error(error);
-//     }
-//   }
+//4) Conectamos Swagger a nuestro servidor de Express:
+
+const specs = swaggerJSDoc(swaggerOptions);
+
+app.use("/apidocs", swaggerUiExpress.serve, swaggerUiExpress.setup(specs));
