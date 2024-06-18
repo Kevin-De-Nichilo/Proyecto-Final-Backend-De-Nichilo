@@ -1,2 +1,4 @@
 node_modules
 /test
+.env.produccion
+.env.desarrollo
